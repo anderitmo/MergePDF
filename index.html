@@ -5,11 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MergePDF Pro - Juntar e Otimizar PDFs</title>
   <meta name="description" content="Combine, reordene, gire e otimize (comprima) seus arquivos PDF gratuitamente e com total privacidade no seu navegador." />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'/></svg>" />
+
   <link rel="stylesheet" href="./style.css" />
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Importmap for bare module resolution when served statically without a bundler -->
+  <script type="importmap">
+  {
+    "imports": {
+      "sortablejs": "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.complete.esm.js",
+      "pdf-lib": "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm",
+      "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/+esm"
+    }
+  }
+  </script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
   
