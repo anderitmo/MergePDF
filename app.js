@@ -1,17 +1,12 @@
-import Sortable from 'sortablejs';
-import { showToast } from './js/toast.js';
-import {
-  loadPdfJsDocument,
-  renderPageThumbnail,
-  renderPageToCanvas,
-  mergeAndOptimizePdfs,
-  formatBytes
-} from './js/pdfService.js';
+// Initialize PDF.js worker from CDN
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
-// State Application Management
+// Global App State
 const state = {
   files: [], // Array of { id, file, name, size, arrayBuffer, pdfJsDoc, pageCount, pages: [...] }
-  customPagesOrder: null, // Array of page objects when reordered across files in Page Grid view
+  customPagesOrder: null,
   viewMode: 'files', // 'files' | 'pages'
   sortableFileInstance: null,
   sortablePageInstance: null
@@ -63,6 +58,57 @@ document.addEventListener('DOMContentLoaded', () => {
   initSortables();
   initButtons();
 });
+
+/* ---------------- Toast Helper ---------------- */
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+
+  const bgColors = {
+    info: 'bg-indigo-900/90 border-indigo-500/50 text-indigo-100',
+    success: 'bg-emerald-900/90 border-emerald-500/50 text-emerald-100',
+    error: 'bg-rose-900/90 border-rose-500/50 text-rose-100',
+    warning: 'bg-amber-900/90 border-amber-500/50 text-amber-100'
+  };
+
+  const icons = {
+    info: `<svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    success: `<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    error: `<svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    warning: `<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`
+  };
+
+  toast.className = `pointer-events-auto flex items-center space-x-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl text-xs sm:text-sm font-medium transform transition-all duration-300 animate-fade-in ${bgColors[type] || bgColors.info}`;
+
+  toast.innerHTML = `
+    <div class="shrink-0">${icons[type] || icons.info}</div>
+    <div class="flex-1">${message}</div>
+    <button type="button" class="shrink-0 text-slate-400 hover:text-slate-100 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  `;
+
+  const closeBtn = toast.querySelector('button');
+  closeBtn.addEventListener('click', () => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 300);
+  });
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 4000);
+}
 
 /* ---------------- Theme Management ---------------- */
 function initTheme() {
@@ -152,7 +198,8 @@ async function handleFiles(filesList) {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdfJsDoc = await loadPdfJsDocument(arrayBuffer.slice(0)); // clone buffer
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
+      const pdfJsDoc = await loadingTask.promise;
       const pageCount = pdfJsDoc.numPages;
 
       const fileObj = {
@@ -189,9 +236,7 @@ async function handleFiles(filesList) {
     }
   }
 
-  // Reset custom page ordering when new files are added so new pages appear at the end
   state.customPagesOrder = null;
-
   hideProcessingModal();
 
   if (successCount > 0) {
@@ -233,7 +278,7 @@ function initSortables() {
       if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
         const movedItem = state.files.splice(oldIndex, 1)[0];
         state.files.splice(newIndex, 0, movedItem);
-        state.customPagesOrder = null; // reset page order to reflect new file order
+        state.customPagesOrder = null;
         renderWorkspaceStats();
       }
     }
@@ -257,12 +302,8 @@ function initSortables() {
   });
 }
 
-/**
- * Returns a flat list of page objects in current order (respecting customPagesOrder if set).
- */
 function getAllPagesFlat() {
   if (state.customPagesOrder && state.customPagesOrder.length > 0) {
-    // Filter out pages belonging to files that may have been deleted
     const validFileIds = new Set(state.files.map(f => f.id));
     return state.customPagesOrder.filter(p => validFileIds.has(p.fileId));
   }
@@ -325,7 +366,6 @@ async function renderWorkspace() {
 
 function renderWorkspaceStats() {
   const totalFiles = state.files.length;
-  let totalPages = 0;
   let totalBytes = 0;
 
   state.files.forEach(f => {
@@ -333,7 +373,7 @@ function renderWorkspaceStats() {
   });
 
   const activePages = getAllPagesFlat().filter(p => p.included);
-  totalPages = activePages.length;
+  const totalPages = activePages.length;
 
   totalFilesCountEl.textContent = `${totalFiles} arquivo(s)`;
   totalPagesCountEl.textContent = `${totalPages} página(s)`;
@@ -357,19 +397,16 @@ function renderFileListView() {
 
     itemEl.innerHTML = `
       <div class="flex items-center space-x-3 flex-1 min-w-0">
-        <!-- Drag Handle -->
         <div class="drag-handle cursor-grab active:cursor-grabbing p-1.5 rounded hover:bg-slate-700 text-slate-500 hover:text-slate-300 transition-colors shrink-0" title="Arrastar para reordenar">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
           </svg>
         </div>
 
-        <!-- PDF Icon -->
         <div class="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">
           PDF
         </div>
 
-        <!-- File Name & Meta -->
         <div class="min-w-0 flex-1">
           <div class="flex items-center space-x-2">
             <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">#${index + 1}</span>
@@ -383,9 +420,7 @@ function renderFileListView() {
         </div>
       </div>
 
-      <!-- Controls -->
       <div class="flex items-center space-x-2 self-end md:self-auto shrink-0">
-        <!-- Rotate File Pages -->
         <button type="button" class="rotate-file-btn p-2 rounded-lg bg-slate-700/70 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center space-x-1 border border-slate-600 transition-colors" title="Girar todas as páginas deste arquivo em 90°">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -393,7 +428,6 @@ function renderFileListView() {
           <span class="hidden sm:inline">Girar</span>
         </button>
 
-        <!-- Delete File -->
         <button type="button" class="remove-file-btn p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-medium flex items-center space-x-1 transition-colors" title="Remover este arquivo">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -438,7 +472,6 @@ async function renderPageGridView() {
     card.setAttribute('data-page-id', pageObj.id);
 
     card.innerHTML = `
-      <!-- Card Header Toolbar -->
       <div class="flex items-center justify-between text-xs text-slate-400">
         <div class="drag-handle-page cursor-grab active:cursor-grabbing p-1 hover:text-slate-200" title="Arrastar página">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -454,7 +487,6 @@ async function renderPageGridView() {
         </button>
       </div>
 
-      <!-- Thumbnail Preview Box -->
       <div class="relative bg-slate-950 rounded-lg h-40 flex items-center justify-center overflow-hidden border border-slate-800/80">
         <div class="thumbnail-loading text-slate-500 text-xs flex items-center space-x-1">
           <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -465,12 +497,10 @@ async function renderPageGridView() {
         <img class="thumbnail-img hidden max-h-full max-w-full object-contain transition-transform duration-200" />
       </div>
 
-      <!-- File origin badge & Rotation indicator -->
       <div class="text-[10px] text-slate-400 truncate text-center" title="${pageObj.fileName}">
         ${pageObj.fileName} (${pageObj.pageNumber})
       </div>
 
-      <!-- Page Controls -->
       <div class="flex items-center justify-between pt-1 border-t border-slate-700/50">
         <button type="button" class="rotate-page-btn p-1.5 rounded hover:bg-slate-700 text-slate-300 text-xs flex items-center space-x-1 transition-colors" title="Girar 90°">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -528,6 +558,37 @@ async function renderPageGridView() {
   }
 }
 
+async function renderPageThumbnail(pdfJsDoc, pageNumber, scale = 0.3) {
+  const page = await pdfJsDoc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+
+  await page.render({ canvasContext: context, viewport }).promise;
+  return canvas.toDataURL('image/jpeg', 0.8);
+}
+
+async function renderPageToCanvas(pdfJsDoc, pageNumber, targetCanvas, maxDimension = 1200) {
+  const page = await pdfJsDoc.getPage(pageNumber);
+  const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+  const scale = Math.min(
+    maxDimension / unscaledViewport.width,
+    maxDimension / unscaledViewport.height,
+    2.0
+  );
+
+  const viewport = page.getViewport({ scale });
+  const context = targetCanvas.getContext('2d');
+  targetCanvas.height = viewport.height;
+  targetCanvas.width = viewport.width;
+
+  await page.render({ canvasContext: context, viewport }).promise;
+}
+
 /* ---------------- Preview Modal ---------------- */
 async function openPagePreviewModal(pageObj) {
   previewModalTitle.textContent = `Visualizando página ${pageObj.pageNumber} - ${pageObj.fileName}`;
@@ -567,7 +628,6 @@ async function handleMergeAndDownload() {
   try {
     const totalOriginalSize = state.files.reduce((acc, f) => acc + f.size, 0);
 
-    // Pass flat ordered pages directly to preserve interleaved drag-and-drop order!
     const itemsToMerge = (state.viewMode === 'pages' || state.customPagesOrder)
       ? activePages
       : state.files;
@@ -616,7 +676,185 @@ async function handleMergeAndDownload() {
   }
 }
 
-/* ---------------- Modal Helpers ---------------- */
+/* ---------------- PDF Merge Logic using PDFLib ---------------- */
+async function mergeAndOptimizePdfs(items, options = {}) {
+  const { PDFDocument, degrees, rgb, StandardFonts } = window.PDFLib;
+  const {
+    compressionLevel = 'recommended',
+    addPageNumbers = false,
+    flattenAnnotations = false,
+    onProgress = () => {}
+  } = options;
+
+  const mergedPdf = await PDFDocument.create();
+
+  let helveticaFont = null;
+  if (addPageNumbers) {
+    helveticaFont = await mergedPdf.embedFont(StandardFonts.Helvetica);
+  }
+
+  const pageTasks = [];
+
+  for (const item of items) {
+    if (item.pages && Array.isArray(item.pages)) {
+      for (const pageObj of item.pages) {
+        if (pageObj.included !== false) {
+          pageTasks.push({
+            fileId: item.id,
+            arrayBuffer: item.arrayBuffer,
+            pdfJsDoc: item.pdfJsDoc,
+            pageIndex: pageObj.pageIndex,
+            rotation: pageObj.rotation || 0
+          });
+        }
+      }
+    } else if (item.included !== false && item.pageIndex !== undefined) {
+      pageTasks.push({
+        fileId: item.fileId,
+        arrayBuffer: item.arrayBuffer,
+        pdfJsDoc: item.pdfJsDoc,
+        pageIndex: item.pageIndex,
+        rotation: item.rotation || 0
+      });
+    }
+  }
+
+  const pdfLibDocsCache = new Map();
+
+  for (let i = 0; i < pageTasks.length; i++) {
+    const task = pageTasks[i];
+
+    onProgress({
+      current: i + 1,
+      total: pageTasks.length,
+      status: `Processando página ${i + 1} de ${pageTasks.length}...`
+    });
+
+    if (compressionLevel === 'high') {
+      const page = await task.pdfJsDoc.getPage(task.pageIndex + 1);
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: 0.9 });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.55);
+      const jpegImage = await mergedPdf.embedJpg(jpegDataUrl);
+
+      const pdfWidth = unscaledViewport.width;
+      const pdfHeight = unscaledViewport.height;
+
+      const newPage = mergedPdf.addPage([pdfWidth, pdfHeight]);
+      newPage.drawImage(jpegImage, {
+        x: 0,
+        y: 0,
+        width: pdfWidth,
+        height: pdfHeight
+      });
+
+      if (task.rotation !== 0) {
+        const currentRot = newPage.getRotation().angle;
+        newPage.setRotation(degrees((currentRot + task.rotation) % 360));
+      }
+
+    } else if (compressionLevel === 'recommended') {
+      const page = await task.pdfJsDoc.getPage(task.pageIndex + 1);
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
+      const viewport = page.getViewport({ scale: 1.25 });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      const jpegImage = await mergedPdf.embedJpg(jpegDataUrl);
+
+      const pdfWidth = unscaledViewport.width;
+      const pdfHeight = unscaledViewport.height;
+
+      const newPage = mergedPdf.addPage([pdfWidth, pdfHeight]);
+      newPage.drawImage(jpegImage, {
+        x: 0,
+        y: 0,
+        width: pdfWidth,
+        height: pdfHeight
+      });
+
+      if (task.rotation !== 0) {
+        const currentRot = newPage.getRotation().angle;
+        newPage.setRotation(degrees((currentRot + task.rotation) % 360));
+      }
+
+    } else {
+      if (!pdfLibDocsCache.has(task.fileId)) {
+        const srcDoc = await PDFDocument.load(task.arrayBuffer, { ignoreEncryption: true });
+        pdfLibDocsCache.set(task.fileId, srcDoc);
+      }
+
+      const srcDoc = pdfLibDocsCache.get(task.fileId);
+      const [copiedPage] = await mergedPdf.copyPages(srcDoc, [task.pageIndex]);
+
+      if (task.rotation !== 0) {
+        const currentRot = copiedPage.getRotation().angle;
+        copiedPage.setRotation(degrees((currentRot + task.rotation) % 360));
+      }
+
+      mergedPdf.addPage(copiedPage);
+    }
+  }
+
+  if (addPageNumbers && helveticaFont) {
+    const pages = mergedPdf.getPages();
+    const totalPages = pages.length;
+
+    pages.forEach((page, idx) => {
+      const { width, height } = page.getSize();
+      const pageNumText = `Página ${idx + 1} de ${totalPages}`;
+      const fontSize = 9;
+      const textWidth = helveticaFont.widthOfTextAtSize(pageNumText, fontSize);
+
+      page.drawText(pageNumText, {
+        x: (width - textWidth) / 2,
+        y: 15,
+        size: fontSize,
+        font: helveticaFont,
+        color: rgb(0.3, 0.3, 0.3)
+      });
+    });
+  }
+
+  if (flattenAnnotations) {
+    try {
+      const form = mergedPdf.getForm();
+      form.flatten();
+    } catch (e) {
+      console.warn('Achatar formulários omitido:', e);
+    }
+  }
+
+  const pdfBytes = await mergedPdf.save({
+    useObjectStreams: true
+  });
+
+  return pdfBytes;
+}
+
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
 function showProcessingModal(title, detail) {
   modalStatusTitle.textContent = title;
   modalStatusDetail.textContent = detail;
