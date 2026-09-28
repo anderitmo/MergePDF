@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-main: #0f172a;
+  --color-bg-card: #1e293b;
+  --color-text-main: #f8fafc;
+  --color-border: #334155;
+}
+
+html.light {
+  --color-bg-main: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-text-main: #0f172a;
+  --color-border: #e2e8f0;
+}
+
+html.light body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.85);
+  border-color: #e2e8f0;
+}
+
+html.light #dropZone {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-color: #cbd5e1;
+}
+
+html.light #dropZone:hover {
+  background-color: rgba(241, 245, 249, 0.9);
+  border-color: #6366f1;
+}
+
+html.light .bg-slate-800 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-slate-800\/80 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.light .bg-slate-800\/90 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .bg-slate-800\/50 {
+  background-color: rgba(241, 245, 249, 0.7) !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-900\/50 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-900\/80 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-950 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-700,
+html.light .border-slate-700\/60,
+html.light .border-slate-700\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .bg-slate-700 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-slate-700\/50 {
+  background-color: #cbd5e1 !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Custom Drag Ghost style */
+.sortable-ghost {
+  opacity: 0.4;
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border: 2px dashed #6366f1 !important;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
